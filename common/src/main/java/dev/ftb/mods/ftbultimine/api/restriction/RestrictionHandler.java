@@ -1,5 +1,6 @@
 package dev.ftb.mods.ftbultimine.api.restriction;
 
+import dev.ftb.mods.ftbultimine.api.util.CanUltimineResult;
 import net.minecraft.world.entity.player.Player;
 
 /**
@@ -9,6 +10,7 @@ import net.minecraft.world.entity.player.Player;
 public interface RestrictionHandler {
     /**
      * Is the player allowed to do ultimining at this time?
+     *
      * @param player the player being checked
      * @return false to prevent ultimining, true to allow (note that if any handlers are registered, <em>all</em> must return true for ultimining to be allowed)
      */
@@ -16,9 +18,9 @@ public interface RestrictionHandler {
 
     /**
      * This is used to get the reason for the restriction to display to the player.
-     * @return Translatable key with the reason Ultimine is being blocked.
+     * @return translatable key with the reason Ultimine is being blocked.
      */
-    default String ultimineBlockReason(Player player) {
-        return "ftbultimine.info.other_restriction";
+    default CanUltimineResult ultimineBlockReason(Player player) {
+        return CanUltimineResult.OTHER_RESTRICTION;
     }
 }

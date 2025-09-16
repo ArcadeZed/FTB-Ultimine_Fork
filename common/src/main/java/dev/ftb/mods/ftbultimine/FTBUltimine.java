@@ -17,6 +17,7 @@ import dev.ftb.mods.ftbultimine.api.rightclick.RegisterRightClickHandlerEvent;
 import dev.ftb.mods.ftbultimine.api.shape.RegisterShapeEvent;
 import dev.ftb.mods.ftbultimine.api.shape.Shape;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
+import dev.ftb.mods.ftbultimine.api.util.CanUltimineResult;
 import dev.ftb.mods.ftbultimine.api.util.ItemCollector;
 import dev.ftb.mods.ftbultimine.client.FTBUltimineClient;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineClientConfig;
@@ -211,84 +212,45 @@ public class FTBUltimine {
 		return true;
 	}
 
-	@FunctionalInterface
-	public interface CanUltimineResult {
-		default boolean isAllowed() {
-			return false;
-		}
-
-		String getTranslationKey();
-	}
-
-	@FunctionalInterface
-	public interface UltimineAllowed extends CanUltimineResult {
-		@Override
-		default boolean isAllowed() {
-			return true;
-		}
-	}
-
-	public static CanUltimineResult prevent(String key) {
-		return () -> key;
-	}
-
-	public static UltimineAllowed allow(String key) {
-		return () -> key;
-	}
-
-	public static final CanUltimineResult ALLOWED = allow("ftbultimine.info.no_valid_block"); /* This keys to "no valid block" because it means there is nothing stopping ultimine except the lack of a valid block to mine. */
-	public static final CanUltimineResult NO_FOOD = prevent("ftbultimine.info.no_food");
-	public static final CanUltimineResult NO_TOOL = prevent("ftbultimine.info.no_tool");
-	public static final CanUltimineResult NO_PERMISSION = prevent("ftbultimine.info.no_permission");
-	public static final CanUltimineResult BLOCKED_TOOL = prevent("ftbultimine.info.denied_tool");
-	public static final CanUltimineResult ON_COOLDOWN = prevent("ftbultimine.info.cooldown");
-	public static final CanUltimineResult OTHER_RESTRICTION = prevent("ftbultimine.info.other_restriction");
-	/* Currently unimplemented. This restriction is grouped under the "ALLOWED" result because we cannot know it on client side right now. */
-	/* public static final CanUltimineResult NO_EXPERIENCE = prevent("ftbultimine.info.no_experience"); */
-
 	/**
 	 * Determines if the player is currently allowed to use Ultimine. Provides the reason it is not allowed as relevant.
-	 *
-	 * Does not determine if there is a valid target for ultimine, hence the "ALLOWED" result pointing at the "no valid block" reason.
-	 * If there is a result of ALLOWED and valid blocks returned from {@link FTBUltiminePlayerData.updateBlocks}, ultimine should be active and working.
+	 * <p>
+	 * Does not determine if there is a valid target for ultimine, hence the "ALLOWED" result pointing at the
+	 * "no valid block" reason. If there is a result of ALLOWED and valid blocks returned from
+	 * {@link FTBUltiminePlayerData#updateBlocks}, ultimine should be active and working.
 	 *
 	 * @param player Player to check status for
-	 *
 	 * @return Result object with the reason that ultimine is not allowed.
 	 */
 	public CanUltimineResult canUltimine(Player player) {
 		if (PlayerHooks.isFake(player) || player.getUUID() == null) {
-			return OTHER_RESTRICTION;
+			return CanUltimineResult.OTHER_RESTRICTION;
 		}
 
 		if (CooldownTracker.isOnCooldown(player)) {
-			return ON_COOLDOWN;
+			return CanUltimineResult.ON_COOLDOWN;
 		}
 
 		if (player.getFoodData().getFoodLevel() <= 0 && !player.isCreative()) {
-			return NO_FOOD;
+			return CanUltimineResult.NO_FOOD;
 		}
 
 		if (!permissionOverride.test(player)) {
-			return NO_PERMISSION;
+			return CanUltimineResult.NO_PERMISSION;
 		}
 
 		var mainHand = player.getMainHandItem();
 		var offHand = player.getOffhandItem();
 		/* Check if the current tool has a deny tag. strict deny applies to either hand. */
 		if (mainHand.is(STRICT_DENY_TAG) || offHand.is(STRICT_DENY_TAG) || mainHand.is(DENY_TAG)) {
-			return BLOCKED_TOOL;
+			return CanUltimineResult.BLOCKED_TOOL;
 		}
 
 		if (!isValidTool(mainHand)) {
-			return NO_TOOL;
-		}
-		String registryResult = RestrictionHandlerRegistry.INSTANCE.canUltimine(player);
-		if (null != registryResult) {
-			return prevent(registryResult);
+			return CanUltimineResult.NO_TOOL;
 		}
 
-		return ALLOWED;
+		return RestrictionHandlerRegistry.INSTANCE.canUltimine(player);
 	}
 
 	public EventResult blockBroken(Level world, BlockPos origPos, BlockState state, ServerPlayer player, @Nullable IntValue xp) {
