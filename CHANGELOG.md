@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * The reason is shown in the ultimine panel, under the "Ultimine is not active" text
   * Thanks @lupusagax
 * Added `es_es` translations (thanks @lupusagax)
-* Added `de_de` translations (thnaks @F1kMajus)
+* Added `de_de` translations (thanks @F1kMajus)
 
 ## [2101.1.9]
 
