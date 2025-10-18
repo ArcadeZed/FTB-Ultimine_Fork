@@ -23,7 +23,7 @@ public enum EZCrystalsHandler implements RightClickHandler {
             int harvested = 0;
 
             for (BlockPos pos : positions) {
-                if (FTBEZCrystals.harvestCrystal(player.level(), pos, player.getMainHandItem(), player)) {
+                if (FTBEZCrystals.harvestCrystal(player.level(), pos, player.getItemInHand(hand), player)) {
                     harvested++;
                 }
             }
