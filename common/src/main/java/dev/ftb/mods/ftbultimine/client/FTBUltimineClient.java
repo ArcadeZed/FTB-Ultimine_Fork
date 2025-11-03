@@ -177,9 +177,9 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 		}
 
 		boolean nextMode;
-		if (keyBindPrevMode.matches(event)) {
+		if (ClientPlatformUtil.doesKeybindMatch(keyBindPrevMode, event)) {
 			nextMode = false;
-		} else if (keyBindNextMode.matches(event)) {
+		} else if (ClientPlatformUtil.doesKeybindMatch(keyBindNextMode, event)) {
 			nextMode = true;
 		} else {
 			return EventResult.pass();
@@ -331,7 +331,7 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 			}
 		}
 		canUltimineStatus = mc.hitResult instanceof BlockHitResult b && b.getType() == HitResult.Type.BLOCK ?
-				FTBUltimine.instance.canUltimine(mc.player, mc.player.level().getBlockState(b.getBlockPos())) :
+				FTBUltimine.instance.canUltimine(mc.player, b.getBlockPos(), mc.player.level().getBlockState(b.getBlockPos())) :
 				CanUltimineResult.NO_BLOCK_TARGETED;
 		canUltimine = pressed && (canUltimineStatus.isAllowed());
 
