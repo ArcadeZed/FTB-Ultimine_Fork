@@ -1,9 +1,9 @@
 package dev.ftb.mods.ftbultimine.rightclick;
 
+import dev.ftb.mods.ftblibrary.platform.Platform;
 import dev.ftb.mods.ftbultimine.api.rightclick.RightClickHandler;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
-import dev.ftb.mods.ftbultimine.utils.PlatformUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,7 +22,7 @@ public enum FarmlandConversion implements RightClickHandler {
         ServerPlayer player = shapeContext.player();
 
         //noinspection ConstantValue
-        if (!FTBUltimineServerConfig.RIGHT_CLICK_HOE.get() || !PlatformUtil.canTillSoil(player.getItemInHand(hand))) {
+        if (!FTBUltimineServerConfig.RIGHT_CLICK_HOE.get() || !Platform.get().misc().canTillSoil(player.getItemInHand(hand))) {
             return 0;
         }
 

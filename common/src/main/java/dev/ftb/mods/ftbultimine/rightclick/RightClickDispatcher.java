@@ -9,7 +9,7 @@ import net.minecraft.world.InteractionHand;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public enum RightClickDispatcher implements RegisterRightClickHandlerEvent.Dispatcher {
+public enum RightClickDispatcher {
     INSTANCE;
 
     public static RightClickDispatcher getInstance() {
@@ -28,7 +28,6 @@ public enum RightClickDispatcher implements RegisterRightClickHandlerEvent.Dispa
         return 0;
     }
 
-    @Override
     public void registerHandler(RightClickHandler handler) {
         handlers.add(handler);
     }

@@ -2,19 +2,14 @@ package dev.ftb.mods.ftbultimine.config;
 
 import dev.ftb.mods.ftblibrary.config.value.*;
 import dev.ftb.mods.ftblibrary.util.PanelPositioning;
+import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 
 import static dev.ftb.mods.ftbultimine.api.FTBUltimineAPI.MOD_ID;
 
 public interface FTBUltimineClientConfig {
 	String KEY = MOD_ID + "-client";
 
-	Config CONFIG = Config.create(KEY)
-			.comment("Client-specific configuration for FTB Ultimine",
-					"Modpack defaults should be defined in <instance>/config/" + KEY + ".snbt",
-					"  (may be overwritten on modpack update)",
-					"Players may locally override this by copying into <instance>/local/" + KEY + ".snbt",
-					"  (will NOT be overwritten on modpack update)"
-			);
+	Config CONFIG = Config.create(KEY).standardTopLevelComment(FTBUltimineAPI.MOD_NAME, KEY, true);
 
 	Config GENERAL = CONFIG.addGroup("general");
 	BooleanValue REQUIRE_ULTIMINE_KEY_FOR_CYCLING = GENERAL.addBoolean("require_ultimine_key_for_cycling", true)
@@ -36,7 +31,7 @@ public interface FTBUltimineClientConfig {
 			.comment("When displaying the shape selection menu by holding the Ultimine key",
 					"and sneaking at the same time, the number of shape names to display",
 					"above and below the selected shape");
-	BooleanValue REQUIRE_SNEAK_FOR_MENU = OVERLAY.addBoolean("require_sneak_for_menu", true)
+	BooleanValue REQUIRE_SNEAK_FOR_MENU = OVERLAY.addBoolean("require_sneak_for_menu", false)
 			.comment("When holding the Ultimine key, must the player also be sneaking to show the shapes menu?");
 	EnumValue<PanelPositioning> OVERLAY_POS = OVERLAY.addEnum("overlay_pos", PanelPositioning.NAME_MAP, PanelPositioning.TOP_LEFT);
 	IntValue OVERLAY_INSET_X = OVERLAY.addInt("overlay_inset_x", 2);

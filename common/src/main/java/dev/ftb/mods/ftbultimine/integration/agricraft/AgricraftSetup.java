@@ -4,7 +4,7 @@ import dev.ftb.mods.ftbultimine.FTBUltimine;
 import dev.ftb.mods.ftbultimine.api.crop.RegisterCropLikeEvent;
 
 public class AgricraftSetup {
-    public static void registerHandler(RegisterCropLikeEvent.Dispatcher dispatcher) {
+    public static void registerHandler(RegisterCropLikeEvent.Data dispatcher) {
         dispatcher.registerHandler(AgriCraftCropLikeHandler.INSTANCE);
         FTBUltimine.LOGGER.info("Agricraft detected, registered Agricraft crop harvest handler");
     }

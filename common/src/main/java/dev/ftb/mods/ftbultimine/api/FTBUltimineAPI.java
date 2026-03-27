@@ -16,38 +16,33 @@ import java.util.Optional;
 
 public class FTBUltimineAPI {
     public static final String MOD_ID = "ftbultimine";
+    public static final String MOD_NAME = "FTB Ultimine";
 
     @Nullable
     private static API instance;
 
-    /**
-     * This convenience method can be used to check if a player is too exhausted food-wise to continue an ultimining
-     * operation.
-     * @param player the player to check
-     * @return true if the player's food level is too low to carry on ultimining
-     */
+    /// This convenience method can be used to check if a player is too exhausted food-wise to continue an ultimining
+    /// operation.
+    /// @param player the player to check
+    /// @return true if the player's food level is too low to carry on ultimining
     public static boolean isTooExhausted(ServerPlayer player) {
         if (player.isCreative()) {
             return false;
         }
         FoodData data = player.getFoodData();
-        return data.exhaustionLevel / 4f > data.getSaturationLevel() + data.getFoodLevel();
+        return FTBUltimineAPI.api().getExhaustionLevel(data) / 4f > data.getSaturationLevel() + data.getFoodLevel();
     }
 
-    /**
-     * Get a resource location in the FTB Ultimine namespace
-     * @param path the path
-     * @return the resource location
-     */
+    /// Get a resource location in the FTB Ultimine namespace
+    /// @param path the path
+    /// @return the resource location
     public static Identifier id(String path) {
         return Identifier.fromNamespaceAndPath(MOD_ID, path);
     }
 
-    /**
-     * Retrieve the public API instance.
-     *
-     * @return the API handler
-     */
+    /// Retrieve the public API instance.
+    ///
+    /// @return the API handler
     public static API api() {
         return Objects.requireNonNull(instance);
     }
@@ -60,30 +55,26 @@ public class FTBUltimineAPI {
         FTBUltimineAPI.instance = instance;
     }
 
-    /**
-     * Top-level API. Retrieve an instance of this via {@link FTBUltimineAPI#api()}.
-     */
+    /// Top-level API. Retrieve an instance of this via [FTBUltimineAPI#api()].
     public interface API {
-        /**
-         * Get a collection of the block positions in the player's current selection.
-         * @param player the player to check
-         * @return an optional collection of the block positions the player has selected;
-         *   {@code Optional.empty()} if the player is not currently ultimining
-         */
+        /// Get a collection of the block positions in the player's current selection.
+        /// @param player the player to check
+        /// @return an optional collection of the block positions the player has selected;
+        ///   `Optional.empty()` if the player is not currently ultimining
         Optional<Collection<BlockPos>> currentBlockSelection(Player player);
 
-        /**
-         * Called by {@link dev.ftb.mods.ftbultimine.api.shape.ShapeContext#check(BlockPos)} to handle any custom
-         * block equivalence checks. You should not normally need to call this directly.
-         *
-         * @param player    the player
-         * @param origPos   the original block position
-         * @param pos       the current position being checked
-         * @param origState the blockstate at the original block position
-         * @param state     the blockstate at the current position
-         * @return TRUE if the blocks are considered equivalent by a custom check, FALSE if definitely not equivalent,
-         * or PASS to defer to the result of standard block equivalence checking, i.e. no custom handler cares.
-         */
+        /// Called by [dev.ftb.mods.ftbultimine.api.shape.ShapeContext#check(BlockPos)] to handle any custom
+        /// block equivalence checks. You should not normally need to call this directly.
+        ///
+        /// @param player    the player
+        /// @param origPos   the original block position
+        /// @param pos       the current position being checked
+        /// @param origState the blockstate at the original block position
+        /// @param state     the blockstate at the current position
+        /// @return TRUE if the blocks are considered equivalent by a custom check, FALSE if definitely not equivalent,
+        /// or PASS to defer to the result of standard block equivalence checking, i.e. no custom handler cares.
         BlockSelectionHandler.Result customSelectionCheck(Player player, BlockPos origPos, BlockPos pos, BlockState origState, BlockState state);
+
+        float getExhaustionLevel(FoodData data);
     }
 }

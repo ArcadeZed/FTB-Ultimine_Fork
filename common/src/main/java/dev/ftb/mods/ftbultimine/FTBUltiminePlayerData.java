@@ -1,6 +1,6 @@
 package dev.ftb.mods.ftbultimine;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
 import dev.ftb.mods.ftbultimine.api.shape.Shape;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.IntSupplier;
 
-/**
- * Server-side player data
- */
+/// Server-side player data
 public class FTBUltiminePlayerData {
 	private final UUID playerId;
 	private boolean pressed = false;
@@ -78,7 +76,7 @@ public class FTBUltiminePlayerData {
 	}
 
 	public Shape getCurrentShape() {
-		return ShapeRegistry.INSTANCE.getShape(shapeIndex);
+		return ShapeRegistry.getInstance(false).getShape(shapeIndex);
 	}
 
 	public int getCurrentShapeIndex() {
@@ -86,7 +84,7 @@ public class FTBUltiminePlayerData {
 	}
 
 	public void cycleShape(boolean next) {
-		int nShapes = ShapeRegistry.INSTANCE.shapeCount();
+		int nShapes = ShapeRegistry.getInstance(false).shapeCount();
 		if (next) {
 			if (++shapeIndex >= nShapes) {
 				shapeIndex = 0;
@@ -125,7 +123,7 @@ public class FTBUltiminePlayerData {
 				clearCache();
 
 				if (sendUpdate) {
-					NetworkManager.sendToPlayer(player, SendShapePacket.adjustShapeAndBlockPos(getCurrentShapeIndex(), Collections.emptyList()));
+					Server2PlayNetworking.send(player, SendShapePacket.adjustShapeAndBlockPos(getCurrentShapeIndex(), Collections.emptyList()));
 				}
 			}
 
@@ -161,7 +159,7 @@ public class FTBUltiminePlayerData {
 		}
 
 		if (sendUpdate) {
-			NetworkManager.sendToPlayer(player, SendShapePacket.adjustShapeAndBlockPos(getCurrentShapeIndex(), cachedBlocks));
+			Server2PlayNetworking.send(player, SendShapePacket.adjustShapeAndBlockPos(getCurrentShapeIndex(), cachedBlocks));
 		}
 
 		return context;

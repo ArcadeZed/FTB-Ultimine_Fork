@@ -1,6 +1,6 @@
 package dev.ftb.mods.ftbultimine.net;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
 import dev.ftb.mods.ftbultimine.FTBUltimine;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import net.minecraft.network.FriendlyByteBuf;
@@ -22,7 +22,7 @@ public record KeyPressedPacket(boolean pressed) implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(KeyPressedPacket message, NetworkManager.PacketContext context) {
-        context.queue(() -> FTBUltimine.getInstance().setKeyPressed((ServerPlayer) context.getPlayer(), message.pressed));
+    public static void handle(KeyPressedPacket message, PacketContext context) {
+        FTBUltimine.getInstance().setKeyPressed((ServerPlayer) context.player(), message.pressed);
     }
 }

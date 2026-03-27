@@ -1,6 +1,6 @@
 package dev.ftb.mods.ftbultimine;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
 import dev.ftb.mods.ftbultimine.net.SyncUltimineTimePacket;
 import dev.ftb.mods.ftbultimine.net.SyncUltimineTimePacket.TimeType;
@@ -19,7 +19,7 @@ public class CooldownTracker {
     private final Map<UUID,Long> lastUltimineTime = new HashMap<>();
 
     // client can't just look at the server config (even though it's sync'd) since we could be using Ranks...
-    // so this get sync'd when the server config changes, or when we get a Ranks event indicating a change
+    // so this gets sync'd when the server config changes, or when we get a Ranks event indicating a change
     private static long ultimineCooldownClient;
 
     public static long getLastUltimineTime(Player player) {
@@ -31,15 +31,13 @@ public class CooldownTracker {
         CooldownTracker instance = player.level().isClientSide() ? clientInstance : serverInstance;
         instance.lastUltimineTime.put(player.getUUID(), when);
         if (player instanceof ServerPlayer sp) {
-            NetworkManager.sendToPlayer(sp, new SyncUltimineTimePacket(when, TimeType.LAST_USED));
+            Server2PlayNetworking.send(sp, new SyncUltimineTimePacket(when, TimeType.LAST_USED));
         }
     }
 
-    /**
-     * Get the remaining cooldown time for the player as a proportion of total time
-     * @param player the player to check
-     * @return a value in the range 0f -> 1f
-     */
+    /// Get the remaining cooldown time for the player as a proportion of total time
+    /// @param player the player to check
+    /// @return a value in the range 0f -> 1f
     public static float getCooldownRemaining(Player player) {
         long coolDown = getUltimineCooldown(player);
         if (coolDown == 0L) {

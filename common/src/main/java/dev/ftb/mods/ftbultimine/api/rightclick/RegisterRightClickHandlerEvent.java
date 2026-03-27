@@ -1,28 +1,19 @@
 package dev.ftb.mods.ftbultimine.api.rightclick;
 
-import dev.architectury.event.Event;
-import dev.architectury.event.EventFactory;
+import java.util.function.Consumer;
 
-/**
- * Listen to this event (fired on server startup) to register custom right-click ultimining handlers.
- */
+/// Fired on server startup to register custom right-click ultimining handlers. See also: [RightClickHandler].
+///
+/// Corresponding platform-native events to listen to:
+/// * `FTBUltimineEvent.RegisterRightClickHandler` (NeoForge)
+/// * `FTBUltimineEvents.REGISTER_RIGHT_CLICK_HANDLER` (Fabric)
 @FunctionalInterface
-public interface RegisterRightClickHandlerEvent {
-    Event<RegisterRightClickHandlerEvent> REGISTER = EventFactory.createLoop();
-
-    /**
-     * Register a new handler.
-     *
-     * @param registry the right-click dispatcher registry
-     */
-    void register(Dispatcher registry);
-
-    @FunctionalInterface
-    interface Dispatcher {
-        /**
-         * Register a new handler.
-         * @param handler the right-click handler to be registered
-         */
-        void registerHandler(RightClickHandler handler);
+public interface RegisterRightClickHandlerEvent extends Consumer<RegisterRightClickHandlerEvent.Data> {
+    record Data(Consumer<RightClickHandler> consumer) {
+        /// Register a new handler.
+        /// @param handler the right-click handler to be registered
+        public void registerHandler(RightClickHandler handler) {
+            consumer.accept(handler);
+        }
     }
 }

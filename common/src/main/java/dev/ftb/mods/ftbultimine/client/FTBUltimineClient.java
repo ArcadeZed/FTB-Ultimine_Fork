@@ -4,23 +4,17 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import dev.architectury.event.EventResult;
-import dev.architectury.event.events.client.ClientGuiEvent;
-import dev.architectury.event.events.client.ClientRawInputEvent;
-import dev.architectury.event.events.client.ClientTickEvent;
-import dev.architectury.networking.NetworkManager;
-import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
 import dev.ftb.mods.ftblibrary.client.gui.GuiHelper;
 import dev.ftb.mods.ftblibrary.client.icon.Color4IRenderer;
 import dev.ftb.mods.ftblibrary.client.util.ClientUtils;
 import dev.ftb.mods.ftblibrary.icon.Color4I;
+import dev.ftb.mods.ftblibrary.platform.client.PlatformClient;
+import dev.ftb.mods.ftblibrary.platform.network.Play2ServerNetworking;
 import dev.ftb.mods.ftbultimine.CooldownTracker;
 import dev.ftb.mods.ftbultimine.FTBUltimine;
-import dev.ftb.mods.ftbultimine.FTBUltimineCommon;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import dev.ftb.mods.ftbultimine.api.util.CanUltimineResult;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineClientConfig;
-import dev.ftb.mods.ftbultimine.event.LevelRenderLastEvent;
 import dev.ftb.mods.ftbultimine.net.KeyPressedPacket;
 import dev.ftb.mods.ftbultimine.net.ModeChangedPacket;
 import dev.ftb.mods.ftbultimine.shape.ShapeRegistry;
@@ -31,13 +25,13 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
@@ -52,15 +46,22 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
-public class FTBUltimineClient extends FTBUltimineCommon {
-	@Nullable
-	public static KeyMapping keyBindUltimine;
-	@Nullable
-	public static KeyMapping keyBindNextMode;
-	@Nullable
-	public static KeyMapping keyBindPrevMode;
+public class FTBUltimineClient {
+	public static final Identifier GUI_OVERLAY_ID = FTBUltimineAPI.id("overlay");
+	private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(FTBUltimineAPI.id("default"));
 
-	private boolean pressed;
+	public static final KeyMapping keyBindUltimine
+			= new KeyMapping("key.ftbultimine", InputConstants.Type.KEYSYM, InputConstants.KEY_GRAVE, KEY_CATEGORY);
+	public static final KeyMapping keyBindNextMode
+			= new KeyMapping("ftbultimine.change_shape.next", InputConstants.Type.KEYSYM, InputConstants.KEY_UP, KEY_CATEGORY);
+	public static final KeyMapping keyBindPrevMode
+			= new KeyMapping("ftbultimine.change_shape.prev", InputConstants.Type.KEYSYM, InputConstants.KEY_DOWN, KEY_CATEGORY);
+
+	@Nullable
+	private static FTBUltimineClient instance;
+
+	private float panelAlphaMult = 0f;
+	private boolean ultimineKeyPressed;
 	private boolean canUltimine;
 	private CanUltimineResult canUltimineStatus = CanUltimineResult.ALLOWED;
 	private List<BlockPos> shapeBlocks = Collections.emptyList();
@@ -76,28 +77,24 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 	private int maxPanelWidth = 100;
 	private List<IndentedLine> infoPanelList = List.of();
 
-	private static final KeyMapping.Category KEY_CATEGORY = KeyMapping.Category.register(FTBUltimineAPI.id("default"));
-
 	public FTBUltimineClient() {
-		KeyMappingRegistry.register(keyBindUltimine = new KeyMapping("key.ftbultimine", InputConstants.Type.KEYSYM, InputConstants.KEY_GRAVE, KEY_CATEGORY));
-		KeyMappingRegistry.register(keyBindNextMode = new KeyMapping("ftbultimine.change_shape.next", InputConstants.Type.KEYSYM, InputConstants.KEY_UP, KEY_CATEGORY));
-		KeyMappingRegistry.register(keyBindPrevMode = new KeyMapping("ftbultimine.change_shape.prev", InputConstants.Type.KEYSYM, InputConstants.KEY_DOWN, KEY_CATEGORY));
+		instance = this;
 
-		ClientTickEvent.CLIENT_PRE.register(this::clientTick);
-		ClientGuiEvent.RENDER_HUD.register(this::renderGameOverlay);
+		PlatformClient.get().registerKeyMapping(FTBUltimineAPI.MOD_ID,
+				keyBindUltimine,
+				keyBindNextMode,
+				keyBindPrevMode
+		);
+	}
 
-		// TODO: remove once #6 gets fixed
-		LevelRenderLastEvent.EVENT.register(this::renderInGame);
-
-		ClientRawInputEvent.MOUSE_SCROLLED.register(this::onMouseScrolled);
-		ClientRawInputEvent.KEY_PRESSED.register(this::onKeyPress);
+	public static FTBUltimineClient getInstance() {
+		return Objects.requireNonNull(instance);
 	}
 
 	public static Player getClientPlayer() {
 		return Objects.requireNonNull(Minecraft.getInstance().player);
 	}
 
-	@Override
 	public void setShape(int shapeIdx, @Nullable List<BlockPos> blocks) {
 		this.shapeIdx = shapeIdx;
 		if (blocks != null) {
@@ -107,44 +104,36 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 			cachedEdges = null;
 			updateEdges();
 		}
-		if (!pressed && FTBUltimineClientConfig.SHAPE_FEEDBACK_MESSAGE.get()) {
-			ClientUtils.getClientPlayer().displayClientMessage(
-					Component.translatable("key.ftbultimine").append(" : ").append(ShapeRegistry.INSTANCE.getShape(shapeIdx).getDisplayName()),
-					true);
+		if (!ultimineKeyPressed && FTBUltimineClientConfig.SHAPE_FEEDBACK_MESSAGE.get()) {
+			Component shapeName = ShapeRegistry.getInstance(true).getShape(shapeIdx).getDisplayName();
+			ClientUtils.getClientPlayer().sendOverlayMessage(
+					Component.translatable("key.ftbultimine").append(" : ").append(shapeName));
 		}
 	}
 
-	@Override
 	@Nullable
-	public Collection<BlockPos> getSelectedBlocks(Player player) {
+	public Collection<BlockPos> getSelectedBlocks() {
 		return actualBlocks == 0 || shapeBlocks.isEmpty() ? null : shapeBlocks;
 	}
 
 	public void renderInGame(PoseStack stack) {
-		if (!pressed || cachedPos == null || cachedEdges == null || cachedEdges.isEmpty()) {
+		if (!ultimineKeyPressed || cachedPos == null || cachedEdges == null || cachedEdges.isEmpty() || !canUltimine) {
 			return;
 		}
 
 		Minecraft mc = Minecraft.getInstance();
-
-		if (!canUltimine) {
+		Camera camera = mc.getEntityRenderDispatcher().camera;
+		if (camera == null) {
 			return;
 		}
-
-		// Rewrite this to use shader that does outline instead
-
-		Camera activeRenderInfo = mc.getEntityRenderDispatcher().camera;
-		if (activeRenderInfo == null) {
-			return;
-		}
-		Vec3 projectedView = activeRenderInfo.position();
+		Vec3 cameraPos = camera.position();
 
 		stack.pushPose();
-		stack.translate(cachedPos.getX() - projectedView.x, cachedPos.getY() - projectedView.y, cachedPos.getZ() - projectedView.z);
+		stack.translate(cachedPos.getX() - cameraPos.x, cachedPos.getY() - cameraPos.y, cachedPos.getZ() - cameraPos.z);
 		Matrix4f matrix = stack.last().pose();
 
+		// solid lines on outer edges of blocks
 		VertexConsumer buffer = mc.renderBuffers().bufferSource().getBuffer(RenderTypes.LINES);
-
 		for (CachedEdge edge : cachedEdges) {
 			buffer.addVertex(matrix, edge.x1(), edge.y1(), edge.z1())
 					.setColor(255, 255, 255, 255)
@@ -156,61 +145,57 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 					.setLineWidth(2f);
 		}
 
-		VertexConsumer buffer2 = mc.renderBuffers().bufferSource().getBuffer(UltimineRenderTypes.LINES_TRANSLUCENT);
-
+		// translucent lines on hidden edges of blocks
+		VertexConsumer buffer2 = mc.renderBuffers().bufferSource().getBuffer(UltimineRenderTypes.LINES_NO_DEPTH_TRANSLUCENT);
 		int alpha = FTBUltimineClientConfig.PREVIEW_LINE_ALPHA.get();
 		for (CachedEdge edge : cachedEdges) {
 			buffer2.addVertex(matrix, edge.x1(), edge.y1(), edge.z1())
 					.setColor(255, 255, 255, alpha)
 					.setNormal(edge.xn(), edge.yn(), edge.zn())
-					.setLineWidth(1.5f);
+					.setLineWidth(1f);
 			buffer2.addVertex(matrix, edge.x2(), edge.y2(), edge.z2())
 					.setColor(255, 255, 255, alpha)
 					.setNormal(edge.xn(), edge.yn(), edge.zn())
-					.setLineWidth(1.5f);
+					.setLineWidth(1f);
 		}
 
 		stack.popPose();
 	}
 
-	public EventResult onMouseScrolled(Minecraft client, double amountX, double amountY) {
-		if (pressed && (amountY != 0 || amountX != 0) && isMenuSneaking()) {
-			NetworkManager.sendToServer(new ModeChangedPacket(amountX < 0D || amountY < 0D));
+	public boolean onMouseScrolled(double amountX, double amountY) {
+		if (ultimineKeyPressed && (amountY != 0 || amountX != 0) && isMenuSneaking()) {
+			Play2ServerNetworking.send(new ModeChangedPacket(amountX < 0D || amountY < 0D));
 			hasScrolledYet = true;
-			return EventResult.interruptFalse();
+			return true;
 		}
 
-		return EventResult.pass();
+		return false;
 	}
 
-	public EventResult onKeyPress(Minecraft client, int action, KeyEvent event) {
-		if ((System.currentTimeMillis() - lastToggle) < INPUT_DELAY) {
-			return EventResult.pass();
+	public boolean onKeyPress() {
+		if ((System.currentTimeMillis() - lastToggle) >= INPUT_DELAY) {
+			if (keyBindPrevMode.isDown()) {
+				cycleCurrentShape(false);
+			} else if (keyBindNextMode.isDown()) {
+				cycleCurrentShape(true);
+			}
 		}
+		return false;
+	}
 
-		boolean nextMode;
-		if (ClientPlatformUtil.doesKeybindMatch(keyBindPrevMode, event)) {
-			nextMode = false;
-		} else if (ClientPlatformUtil.doesKeybindMatch(keyBindNextMode, event)) {
-			nextMode = true;
-		} else {
-			return EventResult.pass();
-		}
-
-		if ((pressed || !FTBUltimineClientConfig.REQUIRE_ULTIMINE_KEY_FOR_CYCLING.get()) && isMenuSneaking()) {
-			NetworkManager.sendToServer(new ModeChangedPacket(nextMode));
+	private void cycleCurrentShape(boolean nextMode) {
+		if ((ultimineKeyPressed || !FTBUltimineClientConfig.REQUIRE_ULTIMINE_KEY_FOR_CYCLING.get()) && isMenuSneaking()) {
+			Play2ServerNetworking.send(new ModeChangedPacket(nextMode));
 			lastToggle = System.currentTimeMillis();
 			hasScrolledYet = true;
 		}
-		return EventResult.pass();
 	}
 
 	private boolean isMenuSneaking() {
 		if (!FTBUltimineClientConfig.REQUIRE_SNEAK_FOR_MENU.get()) return true;
 
-		return keyBindUltimine != null &&
-				(keyBindUltimine.getDefaultKey().getValue() == InputConstants.KEY_LSHIFT
-						|| keyBindUltimine.getDefaultKey().getValue() == InputConstants.KEY_RSHIFT) ?
+		return keyBindUltimine.getDefaultKey().getValue() == InputConstants.KEY_LSHIFT
+				|| keyBindUltimine.getDefaultKey().getValue() == InputConstants.KEY_RSHIFT ?
 				Minecraft.getInstance().hasControlDown() :
 				Minecraft.getInstance().hasShiftDown();
 	}
@@ -233,7 +218,7 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 			builder.add(new IndentedLine(8, Component.translatable(canUltimineStatus.getTranslationKey()).withStyle(style -> style.withColor(TextColor.fromRgb(0xBF616A)))));
 		}
 
-		ShapeRegistry shapeRegistry = ShapeRegistry.INSTANCE;
+		ShapeRegistry shapeRegistry = ShapeRegistry.getInstance(true);
 		int context = Math.min((shapeRegistry.shapeCount() - 1) / 2, FTBUltimineClientConfig.SHAPE_MENU_CONTEXT_LINES.get());
 
 		boolean showingMenu = isMenuSneaking();
@@ -271,8 +256,14 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 		return builder.build();
 	}
 
-	public void renderGameOverlay(GuiGraphics graphics, DeltaTracker tickDelta) {
-		if (pressed) {
+	public void renderGameOverlay(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
+		float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(false);
+		if (ultimineKeyPressed) {
+			panelAlphaMult = Math.min(panelAlphaMult + 0.1f * partialTicks, 1f);
+		} else {
+			panelAlphaMult = Math.max(panelAlphaMult - 0.1f * partialTicks, 0f);
+		}
+		if (panelAlphaMult > 0f) {
 			Minecraft mc = Minecraft.getInstance();
 
 			Font font = mc.font;
@@ -295,20 +286,21 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 
 			Color4IRenderer colorRenderer = Color4IRenderer.INSTANCE;
 			// panel background
-			colorRenderer.render(Color4I.DARK_GRAY.withAlpha(128), graphics, -2, -2, width + 4, height + 4);
-			GuiHelper.drawHollowRect(graphics, -2, -2, width + 4, height + 4, Color4I.GRAY.withAlpha(128), false);
+			colorRenderer.render(Color4I.DARK_GRAY.withAlphaf(0.5f * panelAlphaMult), graphics, -2, -2, width + 4, height + 4);
+			GuiHelper.drawHollowRect(graphics, -2, -2, width + 4, height + 4, Color4I.GRAY.withAlphaf(0.5f * panelAlphaMult), false);
 
 			// draw cooldown progress bar if needed
 			float f = CooldownTracker.getCooldownRemaining(getClientPlayer());
 			if (f < 1f) {
-				colorRenderer.render(Color4I.rgba(0xAA40A040), graphics,0, 0, (int) (width * f) + 1, font.lineHeight + 1);
+				Color4I col = Color4I.rgb(0x40A040).withAlphaf(0.68f * panelAlphaMult);
+				colorRenderer.render(col, graphics,0, 0, (int) (width * f) + 1, font.lineHeight + 1);
 			}
 
 			if (isMenuSneaking()) {
 				// draw the "scrollbar"
 				int barUpper = font.lineHeight * 2;
-				int barHeight = font.lineHeight * (ShapeRegistry.INSTANCE.shapeCount() - 1) - 2;
-				Color4I col = Color4I.WHITE.withAlpha(192);
+				int barHeight = font.lineHeight * (ShapeRegistry.getInstance(true).shapeCount() - 1) - 2;
+				Color4I col = Color4I.WHITE.withAlphaf(0.75f * panelAlphaMult);
 				colorRenderer.render(col, graphics, 3, barUpper, 2, barHeight);
 				colorRenderer.render(col, graphics, 2, barUpper + 1, 4, 1);
 				colorRenderer.render(col, graphics, 1, barUpper + 2, 6, 1);
@@ -320,7 +312,8 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 			int top = 0;
 			for (IndentedLine line : infoPanelList) {
 				FormattedCharSequence formatted = line.text.getVisualOrderText();
-				graphics.drawString(font, formatted, line.indent, top, 0xFFECEFF4, true);
+				Color4I col = Color4I.rgb(0xECEFF4).withAlphaf(panelAlphaMult);
+				graphics.text(font, formatted, line.indent, top, col.rgba(), true);
 				top += font.lineHeight;
 			}
 
@@ -333,23 +326,23 @@ public class FTBUltimineClient extends FTBUltimineCommon {
 			return;
 		}
 
-		boolean p = pressed;
+		boolean p = ultimineKeyPressed;
 
-		if (keyBindUltimine != null && (pressed = keyBindUltimine.isDown()) != p) {
-			NetworkManager.sendToServer(new KeyPressedPacket(pressed));
+		if ((ultimineKeyPressed = keyBindUltimine.isDown()) != p) {
+			Play2ServerNetworking.send(new KeyPressedPacket(ultimineKeyPressed));
 
-			if (pressed && !hasScrolledYet && mc.player != null) {
+			if (ultimineKeyPressed && !hasScrolledYet && mc.player != null) {
 				MutableComponent msg1 = Component.translatable(FTBUltimineClientConfig.REQUIRE_SNEAK_FOR_MENU.get() ?
 						"ftbultimine.change_shape" : "ftbultimine.change_shape.no_shift");
-				mc.player.displayClientMessage(msg1, true);
+				mc.player.sendOverlayMessage(msg1);
 			}
 		}
 		canUltimineStatus = mc.hitResult instanceof BlockHitResult b && b.getType() == HitResult.Type.BLOCK ?
 				FTBUltimine.getInstance().canUltimine(mc.player, b.getBlockPos(), mc.player.level().getBlockState(b.getBlockPos())) :
 				CanUltimineResult.NO_BLOCK_TARGETED;
-		canUltimine = pressed && (canUltimineStatus.isAllowed());
+		canUltimine = ultimineKeyPressed && (canUltimineStatus.isAllowed());
 
-		if (pressed) {
+		if (ultimineKeyPressed) {
 			infoPanelList = addPressedInfo();
 		}
 	}

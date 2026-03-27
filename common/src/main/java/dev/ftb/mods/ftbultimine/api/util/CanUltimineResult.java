@@ -1,13 +1,12 @@
 package dev.ftb.mods.ftbultimine.api.util;
 
+import dev.ftb.mods.ftbultimine.api.restriction.RestrictionHandler;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.ApiStatus;
 
-/**
- * Allows for feedback to be provided to the player about why an ultimining operation may not be performed at a
- * given time. Predefined instances are returned by Ultimine itself, and custom instances of this can be returned by
- * {@link dev.ftb.mods.ftbultimine.api.restriction.RestrictionHandler#ultimineBlockReason(Player)}
- */
+/// Allows for feedback to be provided to the player about why an ultimining operation may not be performed at a
+/// given time. Predefined instances are returned by Ultimine itself, and custom instances of this can be returned by
+/// [RestrictionHandler#ultimineBlockReason(Player)]
 @FunctionalInterface
 public interface CanUltimineResult {
     // the "no valid block" message is shown when everything is OK, but the block selection is empty
@@ -23,27 +22,21 @@ public interface CanUltimineResult {
     // Currently unimplemented. This restriction is grouped under the "ALLOWED" result because we cannot know it on client side right now.
     // public static final CanUltimineResult NO_EXPERIENCE = prevent("ftbultimine.info.no_experience");
 
-    /**
-     * {@return a new prevention instance}
-     * @param key a translation key for the reason, which should translate to a brief message
-     */
+    /// {@return a new prevention instance}
+    /// @param key a translation key for the reason, which should translate to a brief message
     static CanUltimineResult prevent(String key) {
         return () -> key;
     }
 
-    /**
-     * {@return true if ultimining should be allowed, false to prevent it}
-     * <p>
-     * Don't override this; if you need an allowed result, just use {@link #ALLOWED}.
-     */
+    /// {@return true if ultimining should be allowed, false to prevent it}
+    ///
+    /// Don't override this; if you need an allowed result, just use [#ALLOWED].
     @ApiStatus.NonExtendable
     default boolean isAllowed() {
         return false;
     }
 
-    /**
-     * {@return the translation key for the reason, which should translate to a brief message}
-     */
+    /// {@return the translation key for the reason, which should translate to a brief message}
     String getTranslationKey();
 
     @FunctionalInterface

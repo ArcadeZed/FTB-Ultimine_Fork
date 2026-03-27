@@ -30,13 +30,6 @@ ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.ftbultimine]]
-modId = "architectury"
-type = "required"
-versionRange = "[${archversion},)"
-ordering = "NONE"
-side = "BOTH"
-
-[[dependencies.ftbultimine]]
 modId = "ftblibrary"
 type = "required"
 versionRange = "[${ftblibraryversion},)"

@@ -17,16 +17,18 @@
 	"entrypoints": {
 		"main": [
 			"dev.ftb.mods.ftbultimine.fabric.FTBUltimineFabric"
+		],
+		"client": [
+			"dev.ftb.mods.ftbultimine.fabric.FTBUltimineFabricClient"
 		]
 	},
 	"mixins": [
-		"ftbultimine-common.mixins.json"
+		"ftbultimine-common.mixins.json",
+		"ftbultimine-fabric.mixins.json"
 	],
-	"accessWidener": "ftbultimine.accesswidener",
 	"depends": {
-		"fabric": "${fabricapiversionrange}",
+		"fabric-api": "${fabricapiversionrange}",
 		"minecraft": "~${mcversion}",
-		"architectury": ">=${archversion}",
 		"ftblibrary": ">=${ftblibraryversion}"
 	}
 }

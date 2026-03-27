@@ -1,6 +1,6 @@
 package dev.ftb.mods.ftbultimine.net;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
 import dev.ftb.mods.ftblibrary.util.NetworkHelper;
 import dev.ftb.mods.ftbultimine.CooldownTracker;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
@@ -24,13 +24,11 @@ public record SyncUltimineTimePacket(long when, TimeType timetype) implements Cu
         return TYPE;
     }
 
-    public static void handle(SyncUltimineTimePacket message, NetworkManager.PacketContext context) {
-        context.queue(() -> {
-            switch (message.timetype) {
-                case LAST_USED -> CooldownTracker.setLastUltimineTime(FTBUltimineClient.getClientPlayer(), message.when);
-                case COOLDOWN -> CooldownTracker.setClientCooldownTime(message.when);
-            }
-        });
+    public static void handle(SyncUltimineTimePacket message, PacketContext ignoredContext) {
+        switch (message.timetype) {
+            case LAST_USED -> CooldownTracker.setLastUltimineTime(FTBUltimineClient.getClientPlayer(), message.when);
+            case COOLDOWN -> CooldownTracker.setClientCooldownTime(message.when);
+        }
     }
 
     public enum TimeType {

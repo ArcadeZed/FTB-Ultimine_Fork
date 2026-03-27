@@ -1,9 +1,9 @@
 package dev.ftb.mods.ftbultimine.rightclick;
 
+import dev.ftb.mods.ftblibrary.platform.Platform;
 import dev.ftb.mods.ftbultimine.api.rightclick.RightClickHandler;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
-import dev.ftb.mods.ftbultimine.utils.PlatformUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,8 +21,7 @@ public enum AxeStripping implements RightClickHandler {
     public int handleRightClickBlock(ShapeContext shapeContext, InteractionHand hand, Collection<BlockPos> positions) {
         ServerPlayer player = shapeContext.player();
 
-        //noinspection ConstantValue
-        if (!FTBUltimineServerConfig.RIGHT_CLICK_AXE.get() || !PlatformUtil.canAxeStrip(player.getItemInHand(hand))) {
+        if (!FTBUltimineServerConfig.RIGHT_CLICK_AXE.get() || !Platform.get().misc().canAxeStrip(player.getItemInHand(hand))) {
             return 0;
         }
 

@@ -10,21 +10,23 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public enum ShapeRegistry implements RegisterShapeEvent.Registry {
-    INSTANCE;
+public class ShapeRegistry {
+    private static final ShapeRegistry CLIENT_INSTANCE = new ShapeRegistry();
+    private static final ShapeRegistry SERVER_INSTANCE = new ShapeRegistry();
 
     // list of all known shapes
     private final List<Shape> shapesList = new CopyOnWriteArrayList<>();
 
+    public static ShapeRegistry getInstance(boolean clientSide) {
+        return clientSide ? CLIENT_INSTANCE : SERVER_INSTANCE;
+    }
+
     @Nullable
     private Shape defaultShape = null;
 
-    /**
-     * Register a new shape. Only call this via {@link RegisterShapeEvent#register(RegisterShapeEvent.Registry)} !
-     *
-     * @param shape the shape to register
-     */
-    @Override
+    /// Register a new shape. Only call this via [RegisterShapeEvent.Data#register] !
+    ///
+    /// @param shape the shape to register
     public void register(Shape shape) {
         shapesList.add(shape);
 
@@ -38,7 +40,6 @@ public enum ShapeRegistry implements RegisterShapeEvent.Registry {
         }
     }
 
-    @NotNull
     public Shape getShape(int idx) {
         if (idx < 0) {
             idx += shapesList.size();

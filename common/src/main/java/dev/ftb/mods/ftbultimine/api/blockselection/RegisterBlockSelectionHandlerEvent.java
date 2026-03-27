@@ -1,28 +1,20 @@
 package dev.ftb.mods.ftbultimine.api.blockselection;
 
-import dev.architectury.event.Event;
-import dev.architectury.event.EventFactory;
+import java.util.function.Consumer;
 
-/**
- * Listen to this event (fired on server startup) to register a custom block-selection handler.
- */
+/// Fired on server startup to register a custom block-selection handler. See also: [BlockSelectionHandler]
+///
+/// Corresponding platform-native events to listen to:
+/// * `FTBUltimineEvent.RegisterBlockSelectionHandler` (NeoForge)
+/// * `FTBUltimineEvents.REGISTER_BLOCK_SELECTION_HANDLER` (Fabric)
 @FunctionalInterface
-public interface RegisterBlockSelectionHandlerEvent {
-    Event<RegisterBlockSelectionHandlerEvent> REGISTER = EventFactory.createLoop();
-
-    /**
-     * Register a new handler.
-     *
-     * @param registry the registry
-     */
-    void register(RegisterBlockSelectionHandlerEvent.Dispatcher registry);
-
-    interface Dispatcher {
-        /**
-         * Register a new handler.
-         *
-         * @param handler the handler to register
-         */
-        void registerHandler(BlockSelectionHandler handler);
+public interface RegisterBlockSelectionHandlerEvent extends Consumer<RegisterBlockSelectionHandlerEvent.Data> {
+    record Data(Consumer<BlockSelectionHandler> consumer) {
+        /// Register a new handler.
+        ///
+        /// @param handler the handler to register
+        void registerHandler(BlockSelectionHandler handler) {
+            consumer.accept(handler);
+        }
     }
 }

@@ -32,6 +32,8 @@ public class ShapelessShape implements Shape {
 		}
 		NEIGHBOR_POSITIONS_PLANT.add(new BlockPos(0, 1, 0));
 		NEIGHBOR_POSITIONS_PLANT.add(new BlockPos(0, -1, 0));
+		// blocks closer to center point should come first (thus be broken first)
+		NEIGHBOR_POSITIONS_PLANT.sort(Comparator.comparingDouble(o -> o.distSqr(BlockPos.ZERO)));
 	}
 
 	@Override
