@@ -5,10 +5,10 @@
   "mixins": [
     "BlockMixin",
     "CropBlockAccess",
-    "FoodDataAccess",
-    "RenderTypeAccess"
+    "FoodDataAccess"
   ],
   "client": [
+    "RenderTypeAccess"
   ],
   "injectors": {
     "defaultRequire": 1
