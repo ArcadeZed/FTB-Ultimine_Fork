@@ -38,7 +38,7 @@ repositories {
 }
 
 dependencies {
-	implementation("dev.ftb.mods:ftb-library-neoforge:${rootProject.ftb_library_version}")
+	api("dev.ftb.mods:ftb-library-neoforge:${rootProject.ftb_library_version}")
 	implementation("dev.ftb.mods:ftb-ranks-neoforge:${rootProject.ftb_ranks_version}")
 	implementation("dev.ftb.mods:ftb-ez-crystals:${rootProject.ftb_ez_crystals_version}")
 }

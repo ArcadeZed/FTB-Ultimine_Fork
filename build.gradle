@@ -94,6 +94,14 @@ subprojects {
 		}
 
 		maven {
+			name "ModMaven (JEI)"
+			url "https://modmaven.dev/"
+			content {
+				includeGroup "mezz.jei"
+			}
+		}
+
+		maven {
 			url "https://www.cursemaven.com"
 			content {
 				includeGroup "curse.maven"
