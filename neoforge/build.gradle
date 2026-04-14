@@ -37,10 +37,18 @@ repositories {
 	}
 }
 
+configurations {
+	runtimeClasspath.extendsFrom localRuntime
+}
+
 dependencies {
 	api("dev.ftb.mods:ftb-library-neoforge:${rootProject.ftb_library_version}")
-	implementation("dev.ftb.mods:ftb-ranks-neoforge:${rootProject.ftb_ranks_version}")
-	implementation("dev.ftb.mods:ftb-ez-crystals:${rootProject.ftb_ez_crystals_version}")
+
+	compileOnly("dev.ftb.mods:ftb-ranks-neoforge:${rootProject.ftb_ranks_version}")
+	compileOnly("dev.ftb.mods:ftb-ez-crystals:${rootProject.ftb_ez_crystals_version}")
+
+	localRuntime("dev.ftb.mods:ftb-ranks-neoforge:${rootProject.ftb_ranks_version}")
+	localRuntime("dev.ftb.mods:ftb-ez-crystals:${rootProject.ftb_ez_crystals_version}")
 }
 
 jar {
@@ -54,15 +62,5 @@ jar {
 				"Implementation-Vendor"   : project.mod_author,
 				"Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
 		])
-	}
-}
-
-publishing {
-	publications {
-		mavenForge(MavenPublication) {
-			artifactId = "${rootProject.archives_base_name}-${project.name}"
-			version ftbPublishing.mavenVersion
-			from components.java
-		}
 	}
 }
