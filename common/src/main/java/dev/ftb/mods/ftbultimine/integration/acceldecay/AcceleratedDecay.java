@@ -1,9 +1,9 @@
 package dev.ftb.mods.ftbultimine.integration.acceldecay;
 
 public class AcceleratedDecay {
-    public static boolean available;
+    public static boolean isModLoaded;
 
     public static void init() {
-        available = true;
+        isModLoaded = true;
     }
 }

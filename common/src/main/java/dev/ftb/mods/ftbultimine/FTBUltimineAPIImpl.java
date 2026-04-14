@@ -2,8 +2,11 @@ package dev.ftb.mods.ftbultimine;
 
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import dev.ftb.mods.ftbultimine.api.blockselection.BlockSelectionHandler;
+import dev.ftb.mods.ftbultimine.client.FTBUltimineClient;
+import dev.ftb.mods.ftbultimine.mixin.FoodDataAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.food.FoodData;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.Collection;
@@ -14,7 +17,10 @@ public enum FTBUltimineAPIImpl implements FTBUltimineAPI.API {
 
     @Override
     public Optional<Collection<BlockPos>> currentBlockSelection(Player player) {
-        return Optional.ofNullable(FTBUltimine.getInstance().proxy.getSelectedBlocks(player));
+        return Optional.ofNullable(player.level().isClientSide() ?
+                FTBUltimineClient.getInstance().getSelectedBlocks() :
+                FTBUltimine.getInstance().getOrCreatePlayerData(player).cachedPositions()
+        );
     }
 
     @Override
@@ -26,5 +32,10 @@ public enum FTBUltimineAPIImpl implements FTBUltimineAPI.API {
             }
         }
         return BlockSelectionHandler.Result.PASS;
+    }
+
+    @Override
+    public float getExhaustionLevel(FoodData data) {
+        return ((FoodDataAccess) data).ftbUltimine$getExhaustionLevel();
     }
 }

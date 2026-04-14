@@ -1,13 +1,14 @@
 package dev.ftb.mods.ftbultimine.integration.ranks;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
 import dev.ftb.mods.ftbranks.api.FTBRanksAPI;
-import dev.ftb.mods.ftbranks.api.event.RankEvent;
+import dev.ftb.mods.ftbranks.api.RankManager;
 import dev.ftb.mods.ftbultimine.FTBUltimine;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
 import dev.ftb.mods.ftbultimine.net.SyncUltimineTimePacket;
 import dev.ftb.mods.ftbultimine.net.SyncUltimineTimePacket.TimeType;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.NameAndId;
 
 public class FTBRanksIntegration {
     private static final String MAX_BLOCKS_PERM = "ftbultimine.max_blocks";
@@ -15,26 +16,16 @@ public class FTBRanksIntegration {
     private static final String EXPERIENCE_COST_PERM = "ftbultimine.experience_per_block";
     private static final String EXHAUSTION_MULTIPLIER_PERM = "ftbultimine.exhaustion_per_block";
 
-    public static void init() {
-        RankEvent.ADD_PLAYER.register(FTBRanksIntegration::updatePlayer);
-        RankEvent.REMOVE_PLAYER.register(FTBRanksIntegration::updatePlayer);
-        RankEvent.PERMISSION_CHANGED.register(FTBRanksIntegration::updateAllPlayers);
-        RankEvent.RELOADED.register(FTBRanksIntegration::updateAllPlayers);
-        RankEvent.CONDITION_CHANGED.register(FTBRanksIntegration::updateAllPlayers);
-
-        FTBUltimine.LOGGER.info("FTB Ranks detected, listening for ranks events");
-    }
-
-    private static void updatePlayer(RankEvent.Player event) {
-        ServerPlayer sp = event.getManager().getServer().getPlayerList().getPlayer(event.getPlayer().id());
+    public static void updatePlayer(RankManager manager, NameAndId player) {
+        ServerPlayer sp = manager.getServer().getPlayerList().getPlayer(player.id());
         if (sp != null) {
-            NetworkManager.sendToPlayer(sp, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(sp), TimeType.COOLDOWN));
+            Server2PlayNetworking.send(sp, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(sp), TimeType.COOLDOWN));
         }
     }
 
-    private static void updateAllPlayers(RankEvent event) {
-        event.getManager().getServer().getPlayerList().getPlayers().forEach(sp ->
-                NetworkManager.sendToPlayer(sp, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(sp), TimeType.COOLDOWN))
+    public static void updateAllPlayers(RankManager manager) {
+        manager.getServer().getPlayerList().getPlayers().forEach(sp ->
+                Server2PlayNetworking.send(sp, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(sp), TimeType.COOLDOWN))
         );
     }
 

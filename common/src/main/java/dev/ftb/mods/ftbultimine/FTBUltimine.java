@@ -1,13 +1,9 @@
 package dev.ftb.mods.ftbultimine;
 
-import dev.architectury.event.EventResult;
-import dev.architectury.event.events.common.*;
-import dev.architectury.hooks.level.entity.PlayerHooks;
-import dev.architectury.networking.NetworkManager;
-import dev.architectury.registry.ReloadListenerRegistry;
-import dev.architectury.utils.EnvExecutor;
-import dev.architectury.utils.value.IntValue;
 import dev.ftb.mods.ftblibrary.config.manager.ConfigManager;
+import dev.ftb.mods.ftblibrary.platform.Platform;
+import dev.ftb.mods.ftblibrary.platform.event.NativeEventPosting;
+import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
 import dev.ftb.mods.ftblibrary.util.Lazy;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineTags;
@@ -20,7 +16,6 @@ import dev.ftb.mods.ftbultimine.api.shape.RegisterShapeEvent;
 import dev.ftb.mods.ftbultimine.api.shape.Shape;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
 import dev.ftb.mods.ftbultimine.api.util.CanUltimineResult;
-import dev.ftb.mods.ftbultimine.client.FTBUltimineClient;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineClientConfig;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
 import dev.ftb.mods.ftbultimine.crops.CropLikeRegistry;
@@ -36,14 +31,11 @@ import dev.ftb.mods.ftbultimine.registry.ModAttributes;
 import dev.ftb.mods.ftbultimine.rightclick.*;
 import dev.ftb.mods.ftbultimine.shape.*;
 import dev.ftb.mods.ftbultimine.utils.ItemCollector;
-import dev.ftb.mods.ftbultimine.utils.PlatformUtil;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.tags.BlockTags;
@@ -55,12 +47,12 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -71,12 +63,11 @@ public class FTBUltimine {
 
 	public static final Logger LOGGER = LogManager.getLogger();
 
-	public final FTBUltimineCommon proxy;
-
 	private final Map<UUID, FTBUltiminePlayerData> cachedDataMap = new HashMap<>();
 	private boolean isBreakingBlock;
 	private int tempBlockDroppedXp;
 	private final Lazy<ItemCollector> tempBlockDropsList = Lazy.of(ItemCollector::new);
+	private boolean playerTimeSyncNeeded;
 
 	public FTBUltimine() {
 		instance = this;
@@ -91,76 +82,68 @@ public class FTBUltimine {
 		ModAttributes.init();
 		IntegrationHandler.init();
 
-		proxy = EnvExecutor.getEnvSpecific(() -> FTBUltimineClient::new, () -> FTBUltimineCommon::new);
-
-		ReloadListenerRegistry.register(PackType.SERVER_DATA, new DataReloadListener(), FTBUltimineAPI.id("data_reload"));
-
-		LifecycleEvent.SETUP.register(this::commonSetup);
-		PlayerEvent.PLAYER_JOIN.register(this::playerJoined);
-		LifecycleEvent.SERVER_BEFORE_START.register(this::serverStarting);
-		LifecycleEvent.SERVER_STOPPING.register(this::serverStopping);
-		BlockEvent.BREAK.register(this::blockBroken);
-		InteractionEvent.RIGHT_CLICK_BLOCK.register(this::blockRightClick);
-		TickEvent.PLAYER_PRE.register(this::playerTick);
-		EntityEvent.ADD.register(this::entityJoinedWorld);
-		CommandRegistrationEvent.EVENT.register(FTBUltimineCommands::registerCommands);
-
-		RegisterRightClickHandlerEvent.REGISTER.register(this::registerBuiltinHandlers);
-		RegisterShapeEvent.REGISTER.register(this::registerBuiltinShapes);
-		RegisterCropLikeEvent.REGISTER.register(this::registerCropHandlers);
+		Platform.get().addDataPackReloadListener(FTBUltimineAPI.MOD_ID, FTBUltimineAPI.id("data_reload"), new DataReloadListener());
 	}
 
 	public static FTBUltimine getInstance() {
 		return Objects.requireNonNull(instance);
 	}
 
-	private void commonSetup() {
-		RegisterRestrictionHandlerEvent.REGISTER.invoker().register(RestrictionHandlerRegistry.INSTANCE);
-		RegisterShapeEvent.REGISTER.invoker().register(ShapeRegistry.INSTANCE);
+	public static void commonSetup(boolean clientSide) {
+		NativeEventPosting.get().postEvent(new RegisterRestrictionHandlerEvent.Data(RestrictionHandlerRegistry.getInstance(clientSide)::register));
+		NativeEventPosting.get().postEvent(new RegisterShapeEvent.Data(ShapeRegistry.getInstance(clientSide)::register));
 	}
 
-	private void registerBuiltinShapes(RegisterShapeEvent.Registry shapeRegistry) {
-		shapeRegistry.register(new ShapelessShape());
-		shapeRegistry.register(new SmallTunnelShape());
-		shapeRegistry.register(new SmallSquareShape());
-		shapeRegistry.register(new LargeTunnelShape());
-		shapeRegistry.register(new MiningTunnelShape());
-		shapeRegistry.register(new EscapeTunnelShape());
+	public void registerBuiltinShapes(RegisterShapeEvent.Data event) {
+		event.register(new ShapelessShape());
+		event.register(new SmallTunnelShape());
+		event.register(new SmallSquareShape());
+		event.register(new LargeTunnelShape());
+		event.register(new MiningTunnelShape());
+		event.register(new EscapeTunnelShape());
 	}
 
-	private void registerCropHandlers(RegisterCropLikeEvent.Dispatcher dispatcher) {
-		dispatcher.registerHandler(VanillaCropLikeHandler.INSTANCE);
+	public void registerBuiltinCropHandlers(RegisterCropLikeEvent.Data event) {
+		event.registerHandler(VanillaCropLikeHandler.INSTANCE);
 	}
 
-	private void registerBuiltinHandlers(RegisterRightClickHandlerEvent.Dispatcher dispatcher) {
-		dispatcher.registerHandler(AxeStripping.INSTANCE);
-		dispatcher.registerHandler(ShovelFlattening.INSTANCE);
-		dispatcher.registerHandler(FarmlandConversion.INSTANCE);
-		dispatcher.registerHandler(CropHarvesting.INSTANCE);
+	public void registerBuiltinRightClickHandlers(RegisterRightClickHandlerEvent.Data event) {
+		event.registerHandler(AxeStripping.INSTANCE);
+		event.registerHandler(ShovelFlattening.INSTANCE);
+		event.registerHandler(FarmlandConversion.INSTANCE);
+		event.registerHandler(CropHarvesting.INSTANCE);
 	}
 
-	@NotNull
 	public FTBUltiminePlayerData getOrCreatePlayerData(Player player) {
 		return cachedDataMap.computeIfAbsent(player.getUUID(), FTBUltiminePlayerData::new);
 	}
 
-	private void playerJoined(ServerPlayer serverPlayer) {
-		NetworkManager.sendToPlayer(serverPlayer, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(serverPlayer), TimeType.COOLDOWN));
+	public void playerJoined(ServerPlayer serverPlayer) {
+		Server2PlayNetworking.send(serverPlayer, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(serverPlayer), TimeType.COOLDOWN));
 	}
 
-	private void serverStarting(MinecraftServer server) {
-		RegisterRightClickHandlerEvent.REGISTER.invoker().register(RightClickDispatcher.getInstance());
-		RegisterCropLikeEvent.REGISTER.invoker().register(CropLikeRegistry.getInstance());
-		RegisterBlockBreakHandlerEvent.REGISTER.invoker().register(BlockBreakingRegistry.getInstance());
-		RegisterBlockSelectionHandlerEvent.REGISTER.invoker().register(BlockSelectionRegistry.getInstance());
+	public void serverStarting(MinecraftServer ignoredServer) {
+		NativeEventPosting.get().postEvent(new RegisterRightClickHandlerEvent.Data(RightClickDispatcher.getInstance()::registerHandler));
+		NativeEventPosting.get().postEvent(new RegisterCropLikeEvent.Data(CropLikeRegistry.getInstance()::registerHandler));
+		NativeEventPosting.get().postEvent(new RegisterBlockBreakHandlerEvent.Data(BlockBreakingRegistry.getInstance()::registerHandler));
+		NativeEventPosting.get().postEvent(new RegisterBlockSelectionHandlerEvent.Data(BlockSelectionRegistry.getInstance()::registerHandler));
 	}
 
-	private void serverStopping(MinecraftServer server) {
+	public void serverStopping(MinecraftServer ignoredServer) {
 		cachedDataMap.clear();
 		RightClickDispatcher.getInstance().clear();
 		CropLikeRegistry.getInstance().clear();
 		BlockBreakingRegistry.getInstance().clear();
 		BlockSelectionRegistry.getInstance().clear();
+	}
+
+	public void serverTick(MinecraftServer server) {
+		if (playerTimeSyncNeeded) {
+			server.getPlayerList().getPlayers().forEach(sp ->
+					Server2PlayNetworking.send(sp, new SyncUltimineTimePacket(FTBUltimineServerConfig.getUltimineCooldown(sp), TimeType.COOLDOWN))
+			);
+			playerTimeSyncNeeded = false;
+		}
 	}
 
 	public void setKeyPressed(ServerPlayer player, boolean pressed) {
@@ -169,7 +152,7 @@ public class FTBUltimine {
 		data.clearCache();
 
 		if (!data.isPressed()) {
-			NetworkManager.sendToPlayer(player, SendShapePacket.adjustShapeOnly(data.getCurrentShapeIndex()));
+			Server2PlayNetworking.send(player, SendShapePacket.adjustShapeOnly(data.getCurrentShapeIndex()));
 		}
 	}
 
@@ -177,21 +160,19 @@ public class FTBUltimine {
 		FTBUltiminePlayerData data = getOrCreatePlayerData(player);
 		data.cycleShape(next);
 		data.clearCache();
-		NetworkManager.sendToPlayer(player, SendShapePacket.adjustShapeOnly(data.getCurrentShapeIndex()));
+		Server2PlayNetworking.send(player, SendShapePacket.adjustShapeOnly(data.getCurrentShapeIndex()));
 	}
 
-	/**
-	 * Validates if a tool is correct to use. If the strict tag is on an item it applies to the main and offhand slots.
-	 * If to deny tag is on an item it'll deny the main hand item, not sure where this would be required... If the required
-	 * tool config is on, the held item must either have a {@code Tool} component or have a max damage, or be added to
-	 * the ALLOW_TAG item tag.
-	 * <p>
-	 * If no strict deny and no normal deny, and we do not require a tool via config then let everything through
-	 *
-	 * @param player player being checked
-	 *
-	 * @return if the player's equipped tool is valid to be used
-	 */
+	/// Validates if a tool is correct to use. If the strict tag is on an item it applies to the main and offhand slots.
+	/// If to deny tag is on an item it'll deny the main hand item, not sure where this would be required... If the required
+	/// tool config is on, the held item must either have a `Tool` component or have a max damage, or be added to
+	/// the ALLOW_TAG item tag.
+	///
+	/// If no strict deny and no normal deny, and we do not require a tool via config then let everything through
+	///
+	/// @param player player being checked
+	///
+	/// @return if the player's equipped tool is valid to be used
 	public static boolean isValidTool(Player player, BlockPos pos, BlockState state) {
 		ItemStack mainHand = player.getMainHandItem();
 
@@ -201,25 +182,22 @@ public class FTBUltimine {
 			return false;
 		}
 
-        //noinspection ConstantValue
         return !FTBUltimineServerConfig.REQUIRE_VALID_TOOL_FOR_BLOCK.get()
 				|| !state.requiresCorrectToolForDrops()
-				|| PlatformUtil.playerHasCorrectTool(player, pos, state);
+				|| Platform.get().misc().playerHasCorrectTool(player, pos, state);
 	}
 
-	/**
-	 * Determines if the player is currently allowed to use Ultimine. Provides the reason it is not allowed as relevant.
-	 * <p>
-	 * Does not determine if there is a valid target for ultimine, hence the "ALLOWED" result pointing at the
-	 * "no valid block" reason. If there is a result of ALLOWED and valid blocks returned from
-	 * {@link FTBUltiminePlayerData#updateBlocks}, ultimine should be active and working.
-	 *
-	 * @param player Player to check status for
-	 * @param state the blockstate being broken (or about to be broken)
-	 * @return Result object with the reason that ultimine is not allowed.
-	 */
+	/// Determines if the player is currently allowed to use Ultimine. Provides the reason it is not allowed as relevant.
+	///
+	/// Does not determine if there is a valid target for ultimine, hence the "ALLOWED" result pointing at the
+	/// "no valid block" reason. If there is a result of ALLOWED and valid blocks returned from
+	/// [FTBUltiminePlayerData#updateBlocks], ultimine should be active and working.
+	///
+	/// @param player Player to check status for
+	/// @param state the blockstate being broken (or about to be broken)
+	/// @return Result object with the reason that ultimine is not allowed.
 	public CanUltimineResult canUltimine(Player player, BlockPos pos, BlockState state) {
-		if (PlayerHooks.isFake(player)) {
+		if (Platform.get().misc().isFakePlayer(player)) {
 			return CanUltimineResult.OTHER_RESTRICTION;
 		}
 
@@ -239,34 +217,34 @@ public class FTBUltimine {
 		}
 
         return isValidTool(player, pos, state) ?
-				RestrictionHandlerRegistry.INSTANCE.canUltimine(player) :
+				RestrictionHandlerRegistry.getInstance(player.level().isClientSide()).canUltimine(player) :
 				CanUltimineResult.NO_TOOL;
     }
 
-	public EventResult blockBroken(Level world, BlockPos origPos, BlockState state, ServerPlayer player, @Nullable IntValue xp) {
+	public boolean handleBlockBreak(LevelAccessor level, BlockPos origPos, BlockState state, ServerPlayer player) {
 		if (isBreakingBlock || !canUltimine(player, origPos, state).isAllowed()) {
-			return EventResult.pass();
+			return false;
 		}
 
 		FTBUltiminePlayerData data = getOrCreatePlayerData(player);
 		if (!data.isPressed()) {
-			return EventResult.pass();
+			return false;
 		}
 
 		HitResult hitResult = FTBUltiminePlayerData.rayTrace(player);
 		if (!(hitResult instanceof BlockHitResult bhr) || hitResult.getType() != HitResult.Type.BLOCK) {
-			return EventResult.pass();
+			return false;
 		}
 
 		data.clearCache();
 		data.updateBlocks(player, origPos, bhr.getDirection(), false, FTBUltimineServerConfig.getMaxBlocks(player));
 
 		if (!data.hasCachedPositions()) {
-			return EventResult.pass();
+			return false;
 		}
 
 		if (player.totalExperience < Objects.requireNonNull(data.cachedPositions()).size() * FTBUltimineServerConfig.getExperiencePerBlock(player)) {
-			return EventResult.pass();
+			return false;
 		}
 
 		isBreakingBlock = true;
@@ -275,20 +253,20 @@ public class FTBUltimine {
 		boolean hadItem = !player.getMainHandItem().isEmpty();
 
 		Shape shape = data.getCurrentShape();
-		float baseSpeed = state.getDestroySpeed(world, origPos);
+		float baseSpeed = state.getDestroySpeed(level, origPos);
 		int blocksMined = 0;
 		for (BlockPos pos : Objects.requireNonNull(data.cachedPositions())) {
-			BlockState state1 = world.getBlockState(pos);
+			BlockState state1 = level.getBlockState(pos);
 
-			if (AcceleratedDecay.available && state1.is(BlockTags.LEAVES) && LogBreakTracker.INSTANCE.playerRecentlyBrokeLog(player, 1500L)) {
+			if (AcceleratedDecay.isModLoaded && state1.is(BlockTags.LEAVES) && LogBreakTracker.INSTANCE.didPlayerRecentlyBreakLog(player, 1500L)) {
 				// A kludge: if player recently mined a block and now leaves are breaking, and Accelerated Decay is installed,
 				//   then this is almost certainly leaf decay, and not directly broken by the player
 				// https://github.com/FTBTeam/FTB-Modpack-Issues/issues/7713
-				world.destroyBlock(pos, true, player);
+				level.destroyBlock(pos, true, player);
 				continue;
 			}
 
-			float destroySpeed = state1.getDestroySpeed(world, pos);
+			float destroySpeed = state1.getDestroySpeed(level, pos);
             if (!player.isCreative() && (destroySpeed < 0 || destroySpeed > baseSpeed || !isValidTool(player, pos, state1))) {
 				continue;
 			}
@@ -332,9 +310,9 @@ public class FTBUltimine {
 		}
 
 		data.clearCache();
-		NetworkManager.sendToPlayer(player, SendShapePacket.adjustShapeAndBlockPos(data.getCurrentShapeIndex(), List.of()));
+		Server2PlayNetworking.send(player, SendShapePacket.adjustShapeAndBlockPos(data.getCurrentShapeIndex(), List.of()));
 
-		return EventResult.interruptFalse();
+		return true;
 	}
 
 	private static boolean tryBreakBlock(ServerPlayer player, BlockPos pos, BlockState state, Shape shape, BlockHitResult bhr) {
@@ -347,13 +325,13 @@ public class FTBUltimine {
 		return player.gameMode.destroyBlock(pos);
 	}
 
-	public InteractionResult blockRightClick(Player player, InteractionHand hand, BlockPos clickPos, Direction face) {
-		if (PlayerHooks.isFake(player) && CropLikeRegistry.checkForSingleCropHarvesting(player, clickPos)) {
+	public InteractionResult blockRightClick(Player player, InteractionHand hand, BlockPos clickPos) {
+		if (Platform.get().misc().isFakePlayer(player) && CropLikeRegistry.checkForSingleCropHarvesting(player, clickPos)) {
 			// minor kludge: we don't normally allow fake players for ultimining, but single crop harvesting is an exception
 			return InteractionResult.SUCCESS_SERVER;
 		}
 
-		if (!(player instanceof ServerPlayer serverPlayer) || PlayerHooks.isFake(player)) {
+		if (!(player instanceof ServerPlayer serverPlayer) || Platform.get().misc().isFakePlayer(player)) {
 			return InteractionResult.PASS;
 		}
 
@@ -403,7 +381,7 @@ public class FTBUltimine {
 		}
 	}
 
-	public EventResult entityJoinedWorld(Entity entity, Level level) {
+	public boolean handleItemAndOrbJoining(Entity entity, Level level) {
 		// Other mods may have already intercepted this event to do similar absorption;
 		//  the only way to be sure if the entity is still valid is to check if it's alive,
 		//  and hope other mods killed the entity if they've absorbed it.
@@ -413,15 +391,19 @@ public class FTBUltimine {
                     tempBlockDropsList.get().accept(item.getItem());
                     item.setItem(ItemStack.EMPTY);
                 }
-                return EventResult.interruptFalse();
+                return true;
             } else if (entity instanceof ExperienceOrb orb) {
                 tempBlockDroppedXp += orb.getValue();
                 entity.kill(serverLevel);
-                return EventResult.interruptFalse();
+                return true;
             }
         }
-		return EventResult.pass();
+		return false;
 	}
+
+    public void schedulePlayerTimeSync() {
+        playerTimeSyncNeeded = true;
+    }
 
 	private static class DataReloadListener implements ResourceManagerReloadListener {
 		@Override

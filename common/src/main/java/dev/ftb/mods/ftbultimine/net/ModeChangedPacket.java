@@ -1,6 +1,6 @@
 package dev.ftb.mods.ftbultimine.net;
 
-import dev.architectury.networking.NetworkManager;
+import dev.ftb.mods.ftblibrary.platform.network.PacketContext;
 import dev.ftb.mods.ftbultimine.FTBUltimine;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import net.minecraft.network.FriendlyByteBuf;
@@ -22,7 +22,7 @@ public record ModeChangedPacket(boolean next) implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static void handle(ModeChangedPacket message, NetworkManager.PacketContext context) {
-        context.queue(() -> FTBUltimine.getInstance().modeChanged((ServerPlayer) context.getPlayer(), message.next));
+    public static void handle(ModeChangedPacket message, PacketContext context) {
+        FTBUltimine.getInstance().modeChanged((ServerPlayer) context.player(), message.next);
     }
 }

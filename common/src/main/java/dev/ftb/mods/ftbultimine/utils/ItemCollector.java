@@ -9,9 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * Utility class for collecting items dropped during a multi-block ultimining operation.
- */
+/// Utility class for collecting items dropped during a multi-block ultimining operation.
 public class ItemCollector implements Consumer<ItemStack> {
 	private final List<ItemStack> items = new ArrayList<>();
 
@@ -19,11 +17,9 @@ public class ItemCollector implements Consumer<ItemStack> {
 		items.clear();
 	}
 
-	/**
-	 * Add an item to the collection.
-	 *
-	 * @param stack the itemstack to add
-	 */
+	/// Add an item to the collection.
+	///
+	/// @param stack the itemstack to add
 	@Override
 	public void accept(ItemStack stack) {
 		if (!stack.isEmpty()) {
@@ -31,13 +27,11 @@ public class ItemCollector implements Consumer<ItemStack> {
 		}
 	}
 
-	/**
-	 * Drop all the accumulated items at the given position, merging them where possible to reduce the number of
-	 * item entities created.
-	 *
-	 * @param level the level
-	 * @param pos the position to drop items at
-	 */
+	/// Drop all the accumulated items at the given position, merging them where possible to reduce the number of
+	/// item entities created.
+	///
+	/// @param level the level
+	/// @param pos the position to drop items at
 	public void drop(Level level, BlockPos pos) {
 		if (items.isEmpty()) {
 			return;

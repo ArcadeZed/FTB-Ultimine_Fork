@@ -2,7 +2,6 @@ package dev.ftb.mods.ftbultimine.crops;
 
 import dev.ftb.mods.ftbultimine.api.FTBUltimineTags;
 import dev.ftb.mods.ftbultimine.api.crop.CropLikeHandler;
-import dev.ftb.mods.ftbultimine.api.crop.RegisterCropLikeEvent;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
 import dev.ftb.mods.ftbultimine.utils.ItemCollector;
 import net.minecraft.core.BlockPos;
@@ -14,7 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public enum CropLikeRegistry implements RegisterCropLikeEvent.Dispatcher {
+public enum CropLikeRegistry {
     INSTANCE;
 
     private final Set<CropLikeHandler> handlers = ConcurrentHashMap.newKeySet();
@@ -23,7 +22,6 @@ public enum CropLikeRegistry implements RegisterCropLikeEvent.Dispatcher {
         return INSTANCE;
     }
 
-    @Override
     public void registerHandler(CropLikeHandler handler) {
         handlers.add(handler);
     }

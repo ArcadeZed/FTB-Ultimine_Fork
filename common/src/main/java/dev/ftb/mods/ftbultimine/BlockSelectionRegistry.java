@@ -7,7 +7,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-public enum BlockSelectionRegistry implements RegisterBlockSelectionHandlerEvent.Dispatcher {
+public enum BlockSelectionRegistry {
     INSTANCE;
 
     private final Collection<BlockSelectionHandler> handlers = new CopyOnWriteArrayList<>();
@@ -16,7 +16,6 @@ public enum BlockSelectionRegistry implements RegisterBlockSelectionHandlerEvent
         return INSTANCE;
     }
 
-    @Override
     public void registerHandler(BlockSelectionHandler handler) {
         handlers.add(handler);
     }

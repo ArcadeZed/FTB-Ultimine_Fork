@@ -1,12 +1,11 @@
 package dev.ftb.mods.ftbultimine.config;
 
-import dev.architectury.utils.GameInstance;
 import dev.ftb.mods.ftblibrary.config.value.*;
-import dev.ftb.mods.ftblibrary.util.NetworkHelper;
+import dev.ftb.mods.ftblibrary.util.Lazy;
+import dev.ftb.mods.ftbultimine.FTBUltimine;
 import dev.ftb.mods.ftbultimine.api.FTBUltimineAPI;
 import dev.ftb.mods.ftbultimine.integration.IntegrationHandler;
 import dev.ftb.mods.ftbultimine.integration.ranks.FTBRanksIntegration;
-import dev.ftb.mods.ftbultimine.net.SyncUltimineTimePacket;
 import dev.ftb.mods.ftbultimine.registry.ModAttributes;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -19,7 +18,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -29,13 +27,7 @@ import static dev.ftb.mods.ftbultimine.FTBUltimine.LOGGER;
 public interface FTBUltimineServerConfig {
 	String KEY = FTBUltimineAPI.MOD_ID + "-server";
 
-	Config CONFIG = Config.create(KEY)
-			.comment("Server-specific configuration for FTB Ultimine",
-					"Modpack defaults should be defined in <instance>/config/" + KEY + ".snbt",
-					"  (may be overwritten on modpack update)",
-					"Server admins may locally override this by copying into <instance>/world/serverconfig/" + KEY + ".snbt",
-					"  (will NOT be overwritten on modpack update)"
-			);
+	Config CONFIG = Config.create(KEY).standardTopLevelComment(FTBUltimineAPI.MOD_NAME, KEY, false);
 
 	Config FEATURES = CONFIG.addGroup("features");
 
@@ -94,42 +86,37 @@ public interface FTBUltimineServerConfig {
 	BooleanValue CANCEL_ON_BLOCK_BREAK_FAIL = MISC.addBoolean("cancel_on_block_break_fail", false)
 			.comment("If a block couldn't be broken (even though it should be), stop ultimining immediately instead of skipping to the next block.");
 
-	/*********************************************************************/
-
+	///
 	static void onConfigChanged(boolean isServerSide) {
 		if (isServerSide) {
-			MERGE_TAGS_SHAPELESS.tags = null;
-			MERGE_TAGS_SHAPED.tags = null;
+			MERGE_TAGS_SHAPELESS.tags.invalidate();
+			MERGE_TAGS_SHAPED.tags.invalidate();
 
 			if (MAX_BLOCKS.get() > 8192) {
 				LOGGER.warn("'max_blocks' server config setting is set to more than 8192 blocks; this may cause performance issues!");
 			}
 
-			if (GameInstance.getServer() != null) {
-				GameInstance.getServer().getPlayerList().getPlayers().forEach(sp ->
-						NetworkHelper.sendTo(sp, new SyncUltimineTimePacket(getUltimineCooldown(sp), SyncUltimineTimePacket.TimeType.COOLDOWN))
-				);
-			}
+			FTBUltimine.getInstance().schedulePlayerTimeSync();
 		}
 	}
 
 	static int getMaxBlocks(ServerPlayer player) {
-		int max = IntegrationHandler.ranksMod ? FTBRanksIntegration.getMaxBlocks(player, MAX_BLOCKS.get()) : MAX_BLOCKS.get();
+		int max = IntegrationHandler.ftbRanksLoaded ? FTBRanksIntegration.getMaxBlocks(player, MAX_BLOCKS.get()) : MAX_BLOCKS.get();
 		return Math.max(0, max + (int) Math.round(getAttrSafe(player, ModAttributes.FixedHolder.MAX_BLOCKS_MODIFIER.get())));
 	}
 
 	static long getUltimineCooldown(ServerPlayer player) {
-		long cooldown = IntegrationHandler.ranksMod ? FTBRanksIntegration.getUltimineCooldown(player, ULTIMINE_COOLDOWN.get()) : ULTIMINE_COOLDOWN.get();
+		long cooldown = IntegrationHandler.ftbRanksLoaded ? FTBRanksIntegration.getUltimineCooldown(player, ULTIMINE_COOLDOWN.get()) : ULTIMINE_COOLDOWN.get();
 		return Math.max(0, cooldown + Math.round(getAttrSafe(player, ModAttributes.FixedHolder.COOLDOWN_MODIFIER.get())));
 	}
 
 	static double getExhaustionPerBlock(ServerPlayer player) {
-		double ex = IntegrationHandler.ranksMod ? FTBRanksIntegration.getExhaustionPerBlock(player) : EXHAUSTION_PER_BLOCK.get();
+		double ex = IntegrationHandler.ftbRanksLoaded ? FTBRanksIntegration.getExhaustionPerBlock(player) : EXHAUSTION_PER_BLOCK.get();
 		return Math.max(0.0, ex + getAttrSafe(player, ModAttributes.FixedHolder.EXHAUSTION_MODIFIER.get()));
 	}
 
 	static double getExperiencePerBlock(ServerPlayer player) {
-		double ex = IntegrationHandler.ranksMod ? FTBRanksIntegration.getExperiencePerBlock(player) : EXPERIENCE_PER_BLOCK.get();
+		double ex = IntegrationHandler.ftbRanksLoaded ? FTBRanksIntegration.getExperiencePerBlock(player) : EXPERIENCE_PER_BLOCK.get();
 		return Math.max(0.0, ex + getAttrSafe(player, ModAttributes.FixedHolder.EXPERIENCE_MODIFIER.get()));
 	}
 
@@ -140,8 +127,7 @@ public interface FTBUltimineServerConfig {
 	class BlockTagsConfig {
 		private final StringListValue value;
 
-		@Nullable
-		private Set<TagKey<Block>> tags = null;
+		private final Lazy<Set<TagKey<Block>>> tags = Lazy.of(this::buildTags);
 		private boolean matchAny = false;
 
 		public BlockTagsConfig(Config parent, String name, List<String> defaults, String... comment) {
@@ -155,29 +141,31 @@ public interface FTBUltimineServerConfig {
 		}
 
 		public Collection<TagKey<Block>> getTags() {
-			if (tags == null) {
-				if (value.get().contains("*")) {
-					// special-case: this makes for far faster matching when we just want to match everything
-					matchAny = true;
-					tags = Collections.emptySet();
-				} else {
-					tags = new HashSet<>();
-					value.get().forEach(s -> {
-						Identifier rl = Identifier.tryParse(s);
-						if (rl != null) {
-							tags.add(TagKey.create(Registries.BLOCK, rl));
-						} else {
-							Pattern pattern = regexFromGlobString(s);
-							BuiltInRegistries.BLOCK.getTags().forEach((tag) -> {
-								if (pattern.asPredicate().test(tag.key().location().toString())) {
-									tags.add(tag.key());
-								}
-							});
-						}
-					});
-				}
+			return tags.get();
+		}
+
+		private Set<TagKey<Block>> buildTags() {
+			if (value.get().contains("*")) {
+				// special-case: this makes for far faster matching when we just want to match everything
+				matchAny = true;
+				return Set.of();
+			} else {
+				Set<TagKey<Block>> res = new HashSet<>();
+				value.get().forEach(s -> {
+					Identifier id = Identifier.tryParse(s);
+					if (id != null) {
+						res.add(TagKey.create(Registries.BLOCK, id));
+					} else {
+						Pattern pattern = regexFromGlobString(s);
+						BuiltInRegistries.BLOCK.getTags().forEach((tag) -> {
+							if (pattern.asPredicate().test(tag.key().location().toString())) {
+								res.add(tag.key());
+							}
+						});
+					}
+				});
+				return res;
 			}
-			return tags;
 		}
 
 		private static Pattern regexFromGlobString(String glob) {

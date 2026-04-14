@@ -1,6 +1,7 @@
 package dev.ftb.mods.ftbultimine.crops;
 
 import dev.ftb.mods.ftbultimine.api.crop.CropLikeHandler;
+import dev.ftb.mods.ftbultimine.mixin.CropBlockAccess;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -18,7 +19,7 @@ public enum VanillaCropLikeHandler implements CropLikeHandler {
 
     public static boolean looksLikeACrop(BlockState state) {
         // just checking if it's crop-like for breakability purposes (not harvestability)
-        return state.getBlock() instanceof BushBlock || state.getBlock() instanceof CocoaBlock;
+        return state.getBlock() instanceof VegetationBlock || state.getBlock() instanceof CocoaBlock;
     }
 
     public static boolean equivalentForSelection(BlockState orig, BlockState other) {
@@ -76,7 +77,7 @@ public enum VanillaCropLikeHandler implements CropLikeHandler {
 
     private void resetAge(Level level, BlockPos pos, BlockState currentState) {
         if (currentState.getBlock() instanceof CropBlock cropBlock) {
-            BlockState newState = currentState.setValue(cropBlock.getAgeProperty(), 0);
+            BlockState newState = currentState.setValue(((CropBlockAccess) cropBlock).ftbUltimine$getAgeProperty(), 0);
             level.setBlock(pos, newState, Block.UPDATE_ALL);
         } else if (currentState.getBlock() instanceof SweetBerryBushBlock) {
             int currentAge = currentState.getValue(SweetBerryBushBlock.AGE);
