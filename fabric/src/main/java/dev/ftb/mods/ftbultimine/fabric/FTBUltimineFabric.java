@@ -19,6 +19,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.BlockEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
 
 public class FTBUltimineFabric implements ModInitializer {
 	private FTBUltimine ultimine;
@@ -36,8 +37,10 @@ public class FTBUltimineFabric implements ModInitializer {
 		ServerTickEvents.END_SERVER_TICK.register(ultimine::serverTick);
 		PlayerBlockBreakEvents.BEFORE.register((level, player, blockPos, blockState, _) ->
 				!(player instanceof ServerPlayer sp) || !ultimine.handleBlockBreak(level, blockPos, blockState, sp));
-		BlockEvents.USE_ITEM_ON.register((_, _, _, blockPos, player, hand, _) ->
-				ultimine.blockRightClick(player, hand, blockPos));
+		BlockEvents.USE_ITEM_ON.register((_, _, _, blockPos, player, hand, _) -> {
+				InteractionResult result = ultimine.blockRightClick(player, hand, blockPos);
+				return result.consumesAction() ? result : null;
+			});
 		CommandRegistrationCallback.EVENT.register(FTBUltimineCommands::registerCommands);
 		// see PlayerMixin & PersistentEntitySectionManagerMixin for handling player tick & entity join "events"
 
