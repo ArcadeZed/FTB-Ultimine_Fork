@@ -1,10 +1,12 @@
 package dev.ftb.mods.ftbultimine;
 
 import dev.ftb.mods.ftblibrary.platform.network.Server2PlayNetworking;
+import dev.ftb.mods.ftbultimine.api.rightclick.RightClickHandler;
 import dev.ftb.mods.ftbultimine.api.shape.Shape;
 import dev.ftb.mods.ftbultimine.api.shape.ShapeContext;
 import dev.ftb.mods.ftbultimine.config.FTBUltimineServerConfig;
 import dev.ftb.mods.ftbultimine.net.SendShapePacket;
+import dev.ftb.mods.ftbultimine.rightclick.RightClickDispatcher;
 import dev.ftb.mods.ftbultimine.shape.BlockMatchers;
 import dev.ftb.mods.ftbultimine.shape.ShapeRegistry;
 import net.minecraft.commands.CommandSourceStack;
@@ -154,6 +156,13 @@ public class FTBUltiminePlayerData {
 				int max = (int) (player.totalExperience / FTBUltimineServerConfig.getExperiencePerBlock(player));
 				if (max < cachedBlocks.size()) {
 					cachedBlocks = cachedBlocks.subList(0, max);
+				}
+			}
+			for (RightClickHandler handler : RightClickDispatcher.INSTANCE.getHandlers()) {
+				List<BlockPos> filtered = handler.filterPreview(player, cachedBlocks);
+				if (filtered != null) {
+					cachedBlocks = filtered;
+					break;
 				}
 			}
 		}
